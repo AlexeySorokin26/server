@@ -1,2 +1,4 @@
-clientPart/b
-serverPart/b
+clientPart/tcp/b
+serverPart/tcp/b
+clientPart/udp/b
+serverPart/udp/b
