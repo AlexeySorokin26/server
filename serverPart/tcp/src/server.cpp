@@ -1,64 +1,74 @@
-#include <iostream>
-#include <unistd.h>
-#include <stdlib.h>
-#include <cstring>
-#include <arpa/inet.h>
-#include <sys/socket.h> // Библиотека для работы с сокетами
+#include<iostream>
+#include<unistd.h>
+#include<string.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+ 
 using namespace std;
-
-#define MESSAGE_BUFFER 4096 // Максимальный размер буфера для приема и передачи
-#define PORT 7777 // Номер порта, который будем использовать для приема и передачи 
-
-char buffer[MESSAGE_BUFFER]; 
-char message[MESSAGE_BUFFER];
-int socket_file_descriptor, message_size;
+ 
+#define MESSAGE_LENGTH 1024 // Максимальный размер буфера для данных
+#define PORT 7777 // Будем использовать этот номер порта
+ 
+struct sockaddr_in serveraddress, client;
 socklen_t length;
-const char *end_string = "end";
-sockaddr_in serveraddress, client;
-
-void processRequest()  {
+int sockert_file_descriptor, connection, bind_status, connection_status;
+char message[MESSAGE_LENGTH];
+ 
+int main()  {
+    // Создадим сокет
+    sockert_file_descriptor = socket(AF_INET, SOCK_STREAM, 0);
+    if(sockert_file_descriptor == -1){
+        cout << "Socket creation failed.!" << endl;
+        exit(1);
+    }
+    // 
     serveraddress.sin_addr.s_addr = htonl(INADDR_ANY);
-    // The htonl() function converts the unsigned integer hostlong from host byte order to network byte order.
-    // Зададим порт для соединения
+    // Зададим номер порта для связи
     serveraddress.sin_port = htons(PORT);
-    // The htons() function converts the unsigned short integer hostshort from host byte order to network byte order
     // Используем IPv4
     serveraddress.sin_family = AF_INET;
-    // Создадим UDP сокет 
-    socket_file_descriptor = socket(AF_INET, SOCK_DGRAM, 0);
-    // Привяжем сокет 
-    // Give the socket FD the local address ADDR (which is LEN bytes long).
-    // convert to the sockaddr from sockaddr_in that is why but first we 
-    // get a simple address only then convert it to the sockaddr
-    bind(socket_file_descriptor, (sockaddr*)&serveraddress, sizeof(serveraddress));
-    while(1)  {
-        // Длина сообщения от клиента
-        length = sizeof(client);
-        message_size = recvfrom(socket_file_descriptor, buffer, sizeof(buffer), 0, (struct sockaddr*)&client, &length);
-        buffer[message_size] = '\0';
-        if(strcmp(buffer, end_string) == 0)  {
-            cout << "Server is Quitting" << endl;
-            close(socket_file_descriptor);
-            exit(0);
-        }
-        cout << "Message Received from Client: " << buffer << endl;
-        // ответим клиенту
-        cout << "Enter reply message to the client: " << endl;
-        cin >> message;
-        sendto(socket_file_descriptor, message, MESSAGE_BUFFER, 0, (struct sockaddr*)&client, sizeof(client));
-        cout << "Message Sent Successfully to the client: " << message << endl;
-        cout << "Waiting for the Reply from Client..!" << endl;
+    // Привяжем сокет
+    bind_status = bind(sockert_file_descriptor, (struct sockaddr*)&serveraddress,
+    sizeof(serveraddress));
+    if(bind_status == -1)  {
+        cout << "Socket binding failed.!" << endl;
+        exit(1);
     }
- 
+    // Поставим сервер на прием данных 
+    connection_status = listen(sockert_file_descriptor, 5);
+    if(connection_status == -1){
+    cout << "Socket is unable to listen for new connections.!" << endl;
+    exit(1);
+    }  else  {
+            cout << "Server is listening for new connection: " << endl;
+        }
+    length = sizeof(client);
+    connection = accept(sockert_file_descriptor,(struct sockaddr*)&client, &length);
+    if(connection == -1)  {
+        cout << "Server is unable to accept the data from client.!" << endl;
+        exit(1);
+    }
+    
+    // Communication Establishment
+    while(1){
+        bzero(message, MESSAGE_LENGTH);
+        read(connection, message, sizeof(message));
+            if (strncmp("end", message, 3) == 0) {
+                cout << "Client Exited." << endl;
+                cout << "Server is Exiting..!" << endl;
+                break;
+            }
+        cout << "Data received from client: " <<  message << endl;
+        bzero(message, MESSAGE_LENGTH);
+        cout << "Enter the message you want to send to the client: " << endl;
+        cin >> message;
+        ssize_t bytes = write(connection, message, sizeof(message));
+        // Если передали >= 0  байт, значит пересылка прошла успешно
+        if(bytes >= 0)  {
+           cout << "Data successfully sent to the client.!" << endl;
+        }
+    }
     // закрываем сокет, завершаем соединение
-    close(socket_file_descriptor);
+    close(sockert_file_descriptor);
+    return 0;
 }
-
-
-int main() {
-	cout << "SERVER IS LISTENING THROUGH THE PORT: " << PORT << " WITHIN A LOCAL SYSTEM" << endl;
-    // Запускаем функцию обработки сообщений от клиентов и ответа на эти сообщения
-    processRequest();
-	return 0;
-}
-

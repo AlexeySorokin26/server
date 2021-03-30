@@ -1,60 +1,58 @@
 #include <iostream>
 #include <unistd.h>
-#include <stdlib.h>
-#include <cstring>
+#include <string.h>
+#include <sys/socket.h>
 #include <arpa/inet.h>
-#include <sys/socket.h> // Библиотека для работы с сокетами
+ 
 using namespace std;
  
-#define MESSAGE_BUFFER 4096 // Максимальный размер буфера для приема и передачи
-#define PORT 7777 // номер порта, который будем использовать для приема и передачи 
+#define MESSAGE_LENGTH 1024 // Максимальный размер буфера для данных
+#define PORT 7777 // Будем использовать этот номер порта
  
-char buffer[MESSAGE_BUFFER];
-char message[MESSAGE_BUFFER];
-int socket_descriptor;
-sockaddr_in serveraddress;
- 
-
- 
-void sendRequest(){
-    // Укажем адрес сервера
-    serveraddress.sin_addr.s_addr = inet_addr("192.168.126.129"); // 127.0.0.1 localhost
-    // Зададим номер порта для соединения с сервером
-    serveraddress.sin_port = htons(PORT); // hex to net work; translate port to the ... 
-    // Используем IPv4
-    serveraddress.sin_family = AF_INET; // IPv4
-    // Создадим сокет 
-    socket_descriptor = socket(AF_INET, SOCK_DGRAM, 0); // sock_dgram means udp 
-    // Установим соединение с сервером
-    if(connect(socket_descriptor, (sockaddr*) &serveraddress, sizeof(serveraddress)) < 0) {
-        cout << endl << " Something went wrong Connection Failed" << endl;
+int socket_file_descriptor, connection;
+struct sockaddr_in serveraddress, client;
+char message[MESSAGE_LENGTH];
+int main(){
+    // Создадим сокет
+    socket_file_descriptor = socket(AF_INET, SOCK_STREAM, 0);
+    if(socket_file_descriptor == -1){
+        cout << "Creation of Socket failed!" << endl;
         exit(1);
     }
-    
+ 
+    // Установим адрес сервера
+    serveraddress.sin_addr.s_addr = inet_addr("192.168.126.129");
+    // Зададим номер порта
+    serveraddress.sin_port = htons(PORT);
+    // Используем IPv4
+    serveraddress.sin_family = AF_INET;
+    // Установим соединение с сервером
+    connection = connect(socket_file_descriptor, (struct sockaddr*)&serveraddress, sizeof(serveraddress));
+    if(connection == -1){
+        cout << "Connection with the server failed.!" << endl;
+        exit(1);
+    }
+    // Взаимодействие с сервером
     while(1){
-        cout << "Enter a message you want to send to the server: " << endl;
+        bzero(message, sizeof(message));
+        cout << "Enter the message you want to send to the server: " << endl;
         cin >> message;
-        if (strcmp(message, "end") == 0)  {
-            sendto(socket_descriptor, message, MESSAGE_BUFFER, 0, nullptr, sizeof(serveraddress));
-            cout << "Client work is done.!" << endl;
-            close(socket_descriptor);
-            exit(0);
-        }   
-        else {
-            sendto(socket_descriptor, message, MESSAGE_BUFFER, 0, nullptr, sizeof(serveraddress));
-            cout << "Message sent successfully to the server: " <<  message << endl;
-            cout << "Waiting for the Response from Server..." << endl;
+        if ((strncmp(message, "end", 3)) == 0) {
+            write(socket_file_descriptor, message, sizeof(message));
+            cout << "Client Exit." << endl;
+            break;
         }
-        cout << "Message Received From Server: " << endl;
-        recvfrom(socket_descriptor, buffer, sizeof(buffer), 0, nullptr, nullptr);
-        cout <<  buffer << endl;
+        ssize_t bytes = write(socket_file_descriptor, message, sizeof(message));
+        // Если передали >= 0  байт, значит пересылка прошла успешно
+        if(bytes >= 0){
+        cout << "Data send to the server successfully.!" << endl;
+    }
+    bzero(message, sizeof(message));
+    // Ждем ответа от сервера
+    read(socket_file_descriptor, message, sizeof(message));
+    cout << "Data received from server: " << message << endl;
     }
     // закрываем сокет, завершаем соединение
-    close(socket_descriptor);
-}
- 
-int main() {
-    cout << "CLIENT IS ESTABLISHING A CONNECTION WITH SERVER THROUGH PORT: " << PORT << endl;
-    sendRequest();
+    close(socket_file_descriptor);
     return 0;
 }
